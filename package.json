@@ -1,0 +1,25 @@
+{
+  "name": "microbit-firmware-distributor",
+  "version": "1.0.0",
+  "description": "WebUSB parallel firmware distributor for multiple BBC micro:bit devices",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "microbit",
+    "webusb",
+    "firmware",
+    "flash"
+  ],
+  "dependencies": {
+    "@microbit/microbit-connection": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/w3c-web-usb": "^1.0.14",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8"
+  }
+}

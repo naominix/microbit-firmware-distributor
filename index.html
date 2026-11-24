@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>micro:bit Firmware Distributor | 複数台同時フラッシュツール</title>
+    <meta
+      name="description"
+      content="WebUSBを使用して複数のBBC micro:bitにHEXファイルを同時並行で書き込むブラウザツール"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <div class="header-inner">
+          <div class="brand">
+            <div class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="7" width="28" height="18" rx="9" stroke="currentColor" stroke-width="2.5" />
+                <circle cx="11" cy="16" r="2.75" fill="currentColor" />
+                <circle cx="21" cy="16" r="2.75" fill="currentColor" />
+              </svg>
+            </div>
+            <div>
+              <h1>micro:bit Firmware Distributor</h1>
+              <p class="brand-sub">WebUSB 並列 HEX 書き込みツール（V1 / V2・Universal Hex 対応）</p>
+            </div>
+          </div>
+          <div class="header-status">
+            <span id="webusb-badge" class="env-badge env-checking">WebUSB 確認中...</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="main-container">
+        <div id="unsupported-banner" class="alert-banner alert-error hidden" role="alert">
+          <div class="alert-content">
+            <strong>このブラウザは WebUSB に対応していません</strong>
+            <p>
+              複数台の micro:bit へ直接書き込むには、PC / Chromebook / Android の
+              <strong>Google Chrome</strong> または <strong>Microsoft Edge</strong>（HTTPS または localhost 環境）で開いてください。
+            </p>
+          </div>
+        </div>
+
+        <section class="workflow-grid" aria-label="書き込み設定と実行">
+          <!-- Step 1: Firmware File -->
+          <div class="panel firmware-panel">
+            <div class="panel-header">
+              <span class="step-num">1</span>
+              <h2>ファームウェア (.hex)</h2>
+            </div>
+
+            <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="HEXファイルをドロップまたはクリックして選択">
+              <input id="hex-file-input" type="file" accept=".hex" class="sr-only" />
+              <div class="drop-zone-empty" id="drop-zone-empty">
+                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke-linecap="round" stroke-linejoin="round" />
+                  <polyline points="17 8 12 3 7 8" stroke-linecap="round" stroke-linejoin="round" />
+                  <line x1="12" y1="3" x2="12" y2="15" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <p class="drop-title">.hex ファイルをここにドロップ</p>
+                <p class="drop-hint">またはクリックしてファイルを選択</p>
+              </div>
+              <div class="drop-zone-loaded hidden" id="drop-zone-loaded">
+                <div class="file-badge-row">
+                  <span class="file-tag" id="hex-type-tag">HEX</span>
+                  <span class="file-size" id="hex-file-size">0 KB</span>
+                </div>
+                <p class="file-name" id="hex-file-name">firmware.hex</p>
+                <p class="file-change-hint">クリックまたはドロップで差し替え</p>
+              </div>
+            </div>
+
+            <label class="toggle-row" for="partial-flash-toggle">
+              <input type="checkbox" id="partial-flash-toggle" checked />
+              <span class="toggle-text">
+                <strong>高速差分フラッシュ（Partial Flash）</strong>
+                <small>対応ファームウェア時は差分のみ高速転送し、非対応時は自動でフル書き込みします</small>
+              </span>
+            </label>
+          </div>
+
+          <!-- Step 2 & 3: Connection & Execution -->
+          <div class="panel action-panel">
+            <div class="panel-header">
+              <span class="step-num">2</span>
+              <h2>デバイス接続 &amp; 一斉書き込み</h2>
+            </div>
+
+            <div class="connect-actions">
+              <button id="btn-add-device" type="button" class="btn btn-secondary">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+                </svg>
+                micro:bit を追加
+              </button>
+              <button id="btn-reconnect-all" type="button" class="btn btn-ghost">
+                許可済みを一括接続
+              </button>
+              <button id="btn-disconnect-all" type="button" class="btn btn-ghost-danger" disabled>
+                すべて切断
+              </button>
+            </div>
+
+            <div class="summary-strip" aria-live="polite">
+              <div class="stat-item">
+                <span class="stat-label">接続中</span>
+                <span class="stat-value" id="stat-connected">0</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">選択中</span>
+                <span class="stat-value" id="stat-selected">0</span>
+              </div>
+              <div class="stat-item stat-success">
+                <span class="stat-label">成功</span>
+                <span class="stat-value" id="stat-success">0</span>
+              </div>
+              <div class="stat-item stat-error">
+                <span class="stat-label">失敗</span>
+                <span class="stat-value" id="stat-error">0</span>
+              </div>
+            </div>
+
+            <div class="global-progress-wrap">
+              <div class="global-progress-meta">
+                <span id="global-progress-label">待機中</span>
+                <span id="global-progress-percent" class="mono">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="global-progress-bar" class="progress-fill" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <div class="flash-cta-row">
+              <button id="btn-flash-selected" type="button" class="btn btn-primary" disabled>
+                選択中の micro:bit に一斉書き込み
+              </button>
+              <button id="btn-retry-failed" type="button" class="btn btn-warning hidden">
+                失敗分を再試行
+              </button>
+            </div>
+
+            <p class="hardware-note">
+              <strong>運用ヒント:</strong> 複数台を同時接続・書き込みする際は、電力不足による切断を防ぐため
+              <strong>ACアダプタ付き（セルフパワー）USBハブ</strong> の使用を推奨します。
+            </p>
+          </div>
+        </section>
+
+        <!-- Device List Section -->
+        <section class="devices-section" aria-label="接続デバイス一覧">
+          <div class="section-toolbar">
+            <div class="section-title-group">
+              <h2>接続デバイス一覧</h2>
+              <span class="count-pill" id="device-count-pill">0 台</span>
+            </div>
+            <div class="selection-controls">
+              <button id="btn-select-all" type="button" class="btn-link" disabled>すべて選択</button>
+              <span class="divider-dot" aria-hidden="true">·</span>
+              <button id="btn-deselect-all" type="button" class="btn-link" disabled>選択解除</button>
+            </div>
+          </div>
+
+          <div id="devices-empty" class="empty-state">
+            <div class="empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="12" width="36" height="24" rx="12" />
+                <circle cx="18" cy="24" r="3" />
+                <circle cx="30" cy="24" r="3" />
+              </svg>
+            </div>
+            <h3>micro:bit がまだ接続されていません</h3>
+            <p>
+              USB ケーブルで micro:bit を接続し、上の <strong>「micro:bit を追加」</strong> ボタンからペアリングしてください。<br />
+              複数台を順番にペアリングすると、2回目以降は「許可済みを一括接続」でまとめて復元できます。
+            </p>
+          </div>
+
+          <div id="devices-grid" class="devices-grid hidden"></div>
+        </section>
+
+        <!-- Activity Log -->
+        <section class="log-section" aria-label="実行ログ">
+          <div class="log-header">
+            <h2>アクティビティログ</h2>
+            <button id="btn-clear-log" type="button" class="btn-link">ログをクリア</button>
+          </div>
+          <div id="activity-log" class="activity-log" role="log" aria-live="polite"></div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
